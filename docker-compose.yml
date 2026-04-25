@@ -1,0 +1,17 @@
+services:
+  norish-tools:
+    build: .
+    container_name: norish-tools
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./.data:/app/.data
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3000}
+      HOST: ${HOST:-0.0.0.0}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      APP_ACCESS_TOKEN: ${APP_ACCESS_TOKEN}
+      NORISH_BASE_URL: ${NORISH_BASE_URL}
+      NORISH_API_PREFIX: ${NORISH_API_PREFIX:-/api/v1}
+      NORISH_API_KEY: ${NORISH_API_KEY}
