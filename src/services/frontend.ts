@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import type { CalendarSettings } from './calendar-settings-store.js';
 import type { GrocyRecipeSummary } from './grocy-client.js';
 import type { NorishRecipeSummary } from './norish-client.js';
 import { toolCatalog, type ToolDefinition } from './tool-catalog.js';
@@ -115,7 +116,7 @@ export const renderToolPage = (tool: ToolDefinition) =>
     `,
   });
 
-export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string) =>
+export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string, settings: CalendarSettings) =>
   renderDocument({
     title: tool.title,
     activeToolSlug: tool.slug,
@@ -150,7 +151,7 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
               <p id="calendar-token-status" class="small text-secondary mb-4">This URL includes a dedicated calendar feed token generated for this instance and stored outside the env file.</p>
               <h3 class="h6 text-uppercase text-secondary mb-3">Feed Contents</h3>
               <ul class="list-group list-group-flush">
-                <li class="list-group-item px-0">One all-day event per planned recipe item returned by the Norish monthly planner.</li>
+                <li class="list-group-item px-0">Breakfast, lunch, and dinner events use configured times and durations instead of all-day entries.</li>
                 <li class="list-group-item px-0">Event summary formatted as meal slot plus recipe name.</li>
                 <li class="list-group-item px-0">Description fields for servings, calories, recipe ID, and planned item ID when available.</li>
               </ul>
@@ -158,6 +159,32 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
           </div>
         </div>
         <div class="col-12 col-lg-4">
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <p class="text-uppercase small text-secondary fw-semibold mb-2">Meal Times</p>
+              <div class="vstack gap-3 mb-3">
+                <div>
+                  <label for="calendar-breakfast-time" class="form-label">Breakfast</label>
+                  <input id="calendar-breakfast-time" class="form-control" type="time" value="${escapeAttribute(settings.mealTimes.Breakfast)}">
+                  <label for="calendar-breakfast-duration" class="form-label mt-2">Breakfast Length (minutes)</label>
+                  <input id="calendar-breakfast-duration" class="form-control" type="number" min="1" max="720" step="1" value="${escapeAttribute(String(settings.mealDurations.Breakfast))}">
+                </div>
+                <div>
+                  <label for="calendar-lunch-time" class="form-label">Lunch</label>
+                  <input id="calendar-lunch-time" class="form-control" type="time" value="${escapeAttribute(settings.mealTimes.Lunch)}">
+                  <label for="calendar-lunch-duration" class="form-label mt-2">Lunch Length (minutes)</label>
+                  <input id="calendar-lunch-duration" class="form-control" type="number" min="1" max="720" step="1" value="${escapeAttribute(String(settings.mealDurations.Lunch))}">
+                </div>
+                <div>
+                  <label for="calendar-dinner-time" class="form-label">Dinner</label>
+                  <input id="calendar-dinner-time" class="form-control" type="time" value="${escapeAttribute(settings.mealTimes.Dinner)}">
+                  <label for="calendar-dinner-duration" class="form-label mt-2">Dinner Length (minutes)</label>
+                  <input id="calendar-dinner-duration" class="form-control" type="number" min="1" max="720" step="1" value="${escapeAttribute(String(settings.mealDurations.Dinner))}">
+                </div>
+              </div>
+              <button id="save-calendar-settings" class="btn btn-outline-dark w-100" type="button">Save Calendar Settings</button>
+            </div>
+          </div>
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-body p-4">
               <p class="text-uppercase small text-secondary fw-semibold mb-2">Usage</p>
@@ -180,6 +207,13 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
         const copyButton = document.getElementById('copy-feed-url');
         const feedInput = document.getElementById('calendar-feed-url');
         const regenerateButton = document.getElementById('regenerate-feed-token');
+        const saveSettingsButton = document.getElementById('save-calendar-settings');
+        const breakfastTimeInput = document.getElementById('calendar-breakfast-time');
+        const breakfastDurationInput = document.getElementById('calendar-breakfast-duration');
+        const lunchTimeInput = document.getElementById('calendar-lunch-time');
+        const lunchDurationInput = document.getElementById('calendar-lunch-duration');
+        const dinnerTimeInput = document.getElementById('calendar-dinner-time');
+        const dinnerDurationInput = document.getElementById('calendar-dinner-duration');
         const status = document.getElementById('calendar-token-status');
         copyButton.addEventListener('click', async () => {
           await navigator.clipboard.writeText(feedInput.value);
@@ -207,6 +241,56 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
             regenerateButton.removeAttribute('disabled');
           }
         });
+        if (
+          saveSettingsButton instanceof HTMLButtonElement &&
+          breakfastTimeInput instanceof HTMLInputElement &&
+          breakfastDurationInput instanceof HTMLInputElement &&
+          lunchTimeInput instanceof HTMLInputElement &&
+          lunchDurationInput instanceof HTMLInputElement &&
+          dinnerTimeInput instanceof HTMLInputElement
+          && dinnerDurationInput instanceof HTMLInputElement
+        ) {
+          saveSettingsButton.addEventListener('click', async () => {
+            saveSettingsButton.setAttribute('disabled', 'disabled');
+            status.textContent = 'Saving calendar settings...';
+            try {
+              const response = await fetch('/calendar/settings', {
+                method: 'POST',
+                headers: {
+                  'content-type': 'application/json',
+                  accept: 'application/json',
+                },
+                body: JSON.stringify({
+                  mealTimes: {
+                    Breakfast: breakfastTimeInput.value,
+                    Lunch: lunchTimeInput.value,
+                    Dinner: dinnerTimeInput.value,
+                  },
+                  mealDurations: {
+                    Breakfast: breakfastDurationInput.value,
+                    Lunch: lunchDurationInput.value,
+                    Dinner: dinnerDurationInput.value,
+                  },
+                }),
+              });
+              const payload = await response.json().catch(() => ({}));
+              if (!response.ok || !payload.settings) {
+                throw new Error(payload.message || 'Unable to save calendar settings');
+              }
+              breakfastTimeInput.value = payload.settings.mealTimes.Breakfast;
+              breakfastDurationInput.value = String(payload.settings.mealDurations.Breakfast);
+              lunchTimeInput.value = payload.settings.mealTimes.Lunch;
+              lunchDurationInput.value = String(payload.settings.mealDurations.Lunch);
+              dinnerTimeInput.value = payload.settings.mealTimes.Dinner;
+              dinnerDurationInput.value = String(payload.settings.mealDurations.Dinner);
+              status.textContent = payload.message || 'Calendar settings updated.';
+            } catch (error) {
+              status.textContent = error instanceof Error ? error.message : 'Unable to save calendar settings';
+            } finally {
+              saveSettingsButton.removeAttribute('disabled');
+            }
+          });
+        }
       </script>
     `,
   });

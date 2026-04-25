@@ -1,9 +1,10 @@
 import type { NorishPlannedRecipe } from './norish-client.js';
+import type { CalendarSettings, MealSlotTimeKey } from './calendar-settings-store.js';
 
 const calendarName = 'Norish Planned Recipes';
 const calendarProductId = '-//Norish Tools//Calendar Feed//EN';
 
-export const renderPlannedRecipesMonthCalendar = (items: NorishPlannedRecipe[]) => {
+export const renderPlannedRecipesMonthCalendar = (items: NorishPlannedRecipe[], settings: CalendarSettings) => {
   const sortedItems = [...items].sort((left, right) => {
     const dateComparison = left.date.localeCompare(right.date);
 
@@ -25,16 +26,14 @@ export const renderPlannedRecipesMonthCalendar = (items: NorishPlannedRecipe[]) 
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeText(calendarName)}`,
-    ...sortedItems.flatMap((item) => renderEvent(item)),
+    ...sortedItems.flatMap((item) => renderEvent(item, settings)),
     'END:VCALENDAR',
   ];
 
   return `${lines.map(foldLine).join('\r\n')}\r\n`;
 };
 
-const renderEvent = (item: NorishPlannedRecipe) => {
-  const startDate = formatDateForIcs(item.date);
-  const endDate = formatDateForIcs(addDays(item.date, 1));
+const renderEvent = (item: NorishPlannedRecipe, settings: CalendarSettings) => {
   const summary = `${item.slot}: ${item.recipeName ?? 'Untitled recipe'}`;
   const descriptionParts = [
     `Meal slot: ${item.slot}`,
@@ -43,14 +42,19 @@ const renderEvent = (item: NorishPlannedRecipe) => {
     item.calories !== null ? `Calories: ${item.calories}` : null,
     `Recipe ID: ${item.recipeId}`,
     `Planned item ID: ${item.id}`,
+    ...buildTimeDescription(item.slot, settings),
   ].filter((value): value is string => value !== null);
+
+  const timedSlot = getTimedSlot(item.slot);
+  const eventTiming = timedSlot
+    ? buildTimedEvent(item.date, settings.mealTimes[timedSlot], settings.mealDurations[timedSlot])
+    : buildAllDayEvent(item.date);
 
   return [
     'BEGIN:VEVENT',
     `UID:${item.id}@norish-tools`,
     `DTSTAMP:${formatTimestamp(new Date())}`,
-    `DTSTART;VALUE=DATE:${startDate}`,
-    `DTEND;VALUE=DATE:${endDate}`,
+    ...eventTiming,
     `SUMMARY:${escapeText(summary)}`,
     `DESCRIPTION:${escapeText(descriptionParts.join('\n'))}`,
     `CATEGORIES:${escapeText(item.slot)}`,
@@ -59,16 +63,57 @@ const renderEvent = (item: NorishPlannedRecipe) => {
   ];
 };
 
+const buildAllDayEvent = (date: string) => {
+  const startDate = formatDateForIcs(date);
+  const endDate = formatDateForIcs(addDays(date, 1));
+
+  return [`DTSTART;VALUE=DATE:${startDate}`, `DTEND;VALUE=DATE:${endDate}`];
+};
+
+const buildTimedEvent = (date: string, time: string, durationMinutes: number) => {
+  const start = formatLocalDateTime(date, time);
+  const end = formatLocalDateTime(date, addMinutes(time, durationMinutes));
+
+  return [`DTSTART:${start}`, `DTEND:${end}`];
+};
+
+const buildTimeDescription = (slot: NorishPlannedRecipe['slot'], settings: CalendarSettings) => {
+  const timedSlot = getTimedSlot(slot);
+  return timedSlot
+    ? [`Scheduled time: ${settings.mealTimes[timedSlot]}`, `Duration: ${settings.mealDurations[timedSlot]} minutes`]
+    : [];
+};
+
+const getTimedSlot = (slot: NorishPlannedRecipe['slot']): MealSlotTimeKey | null => {
+  if (slot === 'Breakfast' || slot === 'Lunch' || slot === 'Dinner') {
+    return slot;
+  }
+
+  return null;
+};
+
 const formatTimestamp = (value: Date) =>
   `${value.getUTCFullYear()}${pad(value.getUTCMonth() + 1)}${pad(value.getUTCDate())}T${pad(value.getUTCHours())}${pad(value.getUTCMinutes())}${pad(value.getUTCSeconds())}Z`;
 
 const formatDateForIcs = (value: string) => value.replaceAll('-', '');
+
+const formatLocalDateTime = (date: string, time: string) => `${formatDateForIcs(date)}T${time.replace(':', '')}00`;
 
 const addDays = (value: string, days: number) => {
   const date = new Date(`${value}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
 
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
+};
+
+const addMinutes = (value: string, minutes: number) => {
+  const [hoursString, minutesString] = value.split(':');
+  const totalMinutes = Number.parseInt(hoursString ?? '0', 10) * 60 + Number.parseInt(minutesString ?? '0', 10) + minutes;
+  const normalizedMinutes = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hours = Math.floor(normalizedMinutes / 60);
+  const remainingMinutes = normalizedMinutes % 60;
+
+  return `${pad(hours)}:${pad(remainingMinutes)}`;
 };
 
 const pad = (value: number) => value.toString().padStart(2, '0');

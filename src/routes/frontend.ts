@@ -63,7 +63,9 @@ export const registerFrontendRoutes = (app: FastifyInstance) => {
       const origin = getRequestOrigin(request);
       const calendarFeedUrl = `${origin}/calendar/planned-recipes/month.ics?token=${encodeURIComponent(app.calendarTokenStore.getToken())}`;
 
-      return reply.type('text/html; charset=utf-8').send(renderCalendarPage(tool, calendarFeedUrl));
+      return reply
+        .type('text/html; charset=utf-8')
+        .send(renderCalendarPage(tool, calendarFeedUrl, app.calendarSettingsStore.getSettings()));
     }
 
     if (tool.slug === 'grocy-import') {

@@ -1,10 +1,12 @@
 import type { Env } from '../config/env.js';
+import type { CalendarSettingsStore } from '../services/calendar-settings-store.js';
 import type { CalendarTokenStore } from '../services/calendar-token-store.js';
 import type { NorishClient } from '../services/norish-client.js';
 import type { RecipeTextGenerator } from '../services/openai-client.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
+    calendarSettingsStore: CalendarSettingsStore;
     calendarTokenStore: CalendarTokenStore;
     config: Env;
     norish: NorishClient;

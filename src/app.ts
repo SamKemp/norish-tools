@@ -3,12 +3,14 @@ import formbody from '@fastify/formbody';
 import Fastify from 'fastify';
 
 import { env } from './config/env.js';
+import { createCalendarSettingsStore } from './services/calendar-settings-store.js';
 import { createCalendarTokenStore } from './services/calendar-token-store.js';
 import { registerRoutes } from './routes/index.js';
 import { createNorishClient } from './services/norish-client.js';
 import { createRecipeTextGenerator } from './services/openai-client.js';
 
 export const buildApp = () => {
+  const calendarSettingsStore = createCalendarSettingsStore();
   const calendarTokenStore = createCalendarTokenStore();
   void calendarTokenStore.getToken();
 
@@ -24,6 +26,7 @@ export const buildApp = () => {
 
   void app.register(formbody);
 
+  app.decorate('calendarSettingsStore', calendarSettingsStore);
   app.decorate('config', env);
   app.decorate('calendarTokenStore', calendarTokenStore);
   app.decorate('norish', createNorishClient(env));
