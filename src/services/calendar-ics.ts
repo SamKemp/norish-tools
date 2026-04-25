@@ -26,6 +26,7 @@ export const renderPlannedRecipesMonthCalendar = (items: NorishCalendarListItem[
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeText(calendarName)}`,
+    `X-WR-TIMEZONE:${escapeText(settings.timeZone)}`,
     ...sortedItems.flatMap((item) => renderEvent(item, settings)),
     'END:VCALENDAR',
   ];
@@ -50,7 +51,7 @@ const renderEvent = (item: NorishCalendarListItem, settings: CalendarSettings) =
 
   const timedSlot = getTimedSlot(item.slot);
   const eventTiming = timedSlot
-    ? buildTimedEvent(item.date, settings.mealTimes[timedSlot], settings.mealDurations[timedSlot])
+    ? buildTimedEvent(item.date, settings.mealTimes[timedSlot], settings.mealDurations[timedSlot], settings.timeZone)
     : buildAllDayEvent(item.date);
 
   return [
@@ -73,11 +74,12 @@ const buildAllDayEvent = (date: string) => {
   return [`DTSTART;VALUE=DATE:${startDate}`, `DTEND;VALUE=DATE:${endDate}`];
 };
 
-const buildTimedEvent = (date: string, time: string, durationMinutes: number) => {
+const buildTimedEvent = (date: string, time: string, durationMinutes: number, timeZone: string) => {
   const start = formatLocalDateTime(date, time);
   const end = formatLocalDateTime(date, addMinutes(time, durationMinutes));
+  const escapedTimeZone = escapePropertyParameter(timeZone);
 
-  return [`DTSTART:${start}`, `DTEND:${end}`];
+  return [`DTSTART;TZID=${escapedTimeZone}:${start}`, `DTEND;TZID=${escapedTimeZone}:${end}`];
 };
 
 const buildTimeDescription = (slot: NorishCalendarListItem['slot'], settings: CalendarSettings) => {
@@ -141,3 +143,5 @@ const foldLine = (value: string) => {
 
   return chunks.join('\r\n');
 };
+
+const escapePropertyParameter = (value: string) => value.replaceAll('\\', '\\\\').replaceAll(';', '\\;').replaceAll(',', '\\,').replaceAll(':', '\\:');

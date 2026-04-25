@@ -5,6 +5,7 @@ import { renderPlannedRecipesMonthCalendar } from '../services/calendar-ics.js';
 import { isAuthenticated } from './auth.js';
 
 type CalendarSettingsBody = {
+  timeZone?: string;
   mealTimes?: Partial<CalendarMealTimeSettings>;
   mealDurations?: Partial<CalendarMealDurationSettings>;
 };
@@ -25,6 +26,7 @@ export const registerCalendarRoutes = (app: FastifyInstance) => {
     }
 
     const settings = app.calendarSettingsStore.updateSettings({
+      timeZone: request.body?.timeZone,
       mealTimes: {
         Breakfast: request.body?.mealTimes?.Breakfast,
         Lunch: request.body?.mealTimes?.Lunch,
@@ -38,7 +40,7 @@ export const registerCalendarRoutes = (app: FastifyInstance) => {
     });
 
     return reply.send({
-      message: 'Calendar meal times updated.',
+      message: 'Calendar settings updated.',
       settings,
     });
   });

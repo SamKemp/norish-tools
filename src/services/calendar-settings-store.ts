@@ -7,8 +7,15 @@ export type CalendarMealTimeSettings = Record<MealSlotTimeKey, string>;
 export type CalendarMealDurationSettings = Record<MealSlotTimeKey, number>;
 
 export type CalendarSettings = {
+  timeZone: string;
   mealTimes: CalendarMealTimeSettings;
   mealDurations: CalendarMealDurationSettings;
+};
+
+type CalendarSettingsInput = {
+  timeZone?: unknown;
+  mealTimes?: Partial<Record<MealSlotTimeKey, unknown>>;
+  mealDurations?: Partial<Record<MealSlotTimeKey, unknown>>;
 };
 
 const defaultSettings: CalendarMealTimeSettings = {
@@ -23,6 +30,8 @@ const defaultDurations: CalendarMealDurationSettings = {
   Dinner: 30,
 };
 
+const defaultTimeZone = getDefaultTimeZone();
+
 const defaultSettingsFilePath = resolve(process.cwd(), '.data', 'calendar-meal-times.json');
 
 export type CalendarSettingsStore = ReturnType<typeof createCalendarSettingsStore>;
@@ -30,13 +39,10 @@ export type CalendarSettingsStore = ReturnType<typeof createCalendarSettingsStor
 export const createCalendarSettingsStore = (filePath = defaultSettingsFilePath) => {
   const getSettings = () => {
     const storedSettings = readSettings(filePath);
-    return storedSettings ?? { mealTimes: defaultSettings, mealDurations: defaultDurations };
+    return storedSettings ?? { timeZone: defaultTimeZone, mealTimes: defaultSettings, mealDurations: defaultDurations };
   };
 
-  const updateSettings = (nextSettings: {
-    mealTimes?: Partial<Record<MealSlotTimeKey, unknown>>;
-    mealDurations?: Partial<Record<MealSlotTimeKey, unknown>>;
-  }) => {
+  const updateSettings = (nextSettings: CalendarSettingsInput) => {
     const normalizedSettings = normalizeSettings(nextSettings);
     persistSettings(filePath, normalizedSettings);
     return normalizedSettings;
@@ -52,10 +58,7 @@ export const createCalendarSettingsStore = (filePath = defaultSettingsFilePath) 
 const readSettings = (filePath: string): CalendarSettings | null => {
   try {
     const raw = readFileSync(filePath, 'utf8');
-    const parsed = JSON.parse(raw) as {
-      mealTimes?: Partial<Record<MealSlotTimeKey, unknown>>;
-      mealDurations?: Partial<Record<MealSlotTimeKey, unknown>>;
-    };
+    const parsed = JSON.parse(raw) as CalendarSettingsInput;
     return normalizeSettings(parsed);
   } catch {
     return null;
@@ -67,10 +70,8 @@ const persistSettings = (filePath: string, settings: CalendarSettings) => {
   writeFileSync(filePath, `${JSON.stringify(settings, null, 2)}\n`, { encoding: 'utf8' });
 };
 
-const normalizeSettings = (value: {
-  mealTimes?: Partial<Record<MealSlotTimeKey, unknown>>;
-  mealDurations?: Partial<Record<MealSlotTimeKey, unknown>>;
-}): CalendarSettings => ({
+const normalizeSettings = (value: CalendarSettingsInput): CalendarSettings => ({
+  timeZone: normalizeTimeZone(value.timeZone, defaultTimeZone),
   mealTimes: {
     Breakfast: normalizeTime(value.mealTimes?.Breakfast, defaultSettings.Breakfast),
     Lunch: normalizeTime(value.mealTimes?.Lunch, defaultSettings.Lunch),
@@ -98,3 +99,22 @@ const normalizeDuration = (value: unknown, fallback: number) => {
 
   return Number.isInteger(candidate) && candidate > 0 && candidate <= 720 ? candidate : fallback;
 };
+
+const normalizeTimeZone = (value: unknown, fallback: string) => {
+  const candidate = typeof value === 'string' ? value.trim() : '';
+
+  if (!candidate) {
+    return fallback;
+  }
+
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: candidate }).format(new Date());
+    return candidate;
+  } catch {
+    return fallback;
+  }
+};
+
+function getDefaultTimeZone() {
+  return normalizeTimeZone(process.env.TZ, 'UTC');
+}

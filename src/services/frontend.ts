@@ -152,7 +152,7 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
               <h3 class="h6 text-uppercase text-secondary mb-3">Feed Contents</h3>
               <ul class="list-group list-group-flush">
                 <li class="list-group-item px-0">The feed uses Norish's internal calendar.listItems endpoint over a rolling date range instead of the one-month public endpoint.</li>
-                <li class="list-group-item px-0">Breakfast, lunch, and dinner events use configured times and durations instead of all-day entries.</li>
+                <li class="list-group-item px-0">Breakfast, lunch, and dinner events use configured times, durations, and timezone instead of all-day entries.</li>
                 <li class="list-group-item px-0">Event summary formatted as meal slot plus recipe name.</li>
                 <li class="list-group-item px-0">Description fields for servings, calories, recipe ID, and planned item ID when available.</li>
               </ul>
@@ -162,7 +162,14 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
         <div class="col-12 col-lg-4">
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-body p-4">
-              <p class="text-uppercase small text-secondary fw-semibold mb-2">Meal Times</p>
+              <p class="text-uppercase small text-secondary fw-semibold mb-2">Calendar Settings</p>
+              <div class="mb-3">
+                <label for="calendar-timezone" class="form-label">Timezone</label>
+                <input id="calendar-timezone" class="form-control" type="text" value="${escapeAttribute(settings.timeZone)}" placeholder="Europe/London" spellcheck="false" autocapitalize="off" autocomplete="off">
+                <div class="form-text">Use an IANA timezone such as Europe/London or America/New_York.</div>
+                <button id="calendar-use-browser-timezone" class="btn btn-sm btn-outline-secondary mt-2" type="button">Use Browser Timezone</button>
+                <p id="calendar-timezone-hint" class="small text-secondary mt-2 mb-0"></p>
+              </div>
               <div class="vstack gap-3 mb-3">
                 <div>
                   <label for="calendar-breakfast-time" class="form-label">Breakfast</label>
@@ -209,6 +216,9 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
         const feedInput = document.getElementById('calendar-feed-url');
         const regenerateButton = document.getElementById('regenerate-feed-token');
         const saveSettingsButton = document.getElementById('save-calendar-settings');
+        const timeZoneInput = document.getElementById('calendar-timezone');
+        const useBrowserTimeZoneButton = document.getElementById('calendar-use-browser-timezone');
+        const timeZoneHint = document.getElementById('calendar-timezone-hint');
         const breakfastTimeInput = document.getElementById('calendar-breakfast-time');
         const breakfastDurationInput = document.getElementById('calendar-breakfast-duration');
         const lunchTimeInput = document.getElementById('calendar-lunch-time');
@@ -216,6 +226,28 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
         const dinnerTimeInput = document.getElementById('calendar-dinner-time');
         const dinnerDurationInput = document.getElementById('calendar-dinner-duration');
         const status = document.getElementById('calendar-token-status');
+        const browserTimeZone = (() => {
+          try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+          } catch {
+            return '';
+          }
+        })();
+        if (timeZoneHint instanceof HTMLElement) {
+          timeZoneHint.textContent = browserTimeZone
+            ? 'Browser timezone detected: ' + browserTimeZone
+            : 'Browser timezone could not be detected automatically.';
+        }
+        if (useBrowserTimeZoneButton instanceof HTMLButtonElement && timeZoneInput instanceof HTMLInputElement) {
+          useBrowserTimeZoneButton.addEventListener('click', () => {
+            if (!browserTimeZone) {
+              status.textContent = 'Browser timezone could not be detected';
+              return;
+            }
+            timeZoneInput.value = browserTimeZone;
+            status.textContent = 'Timezone set to browser timezone. Save calendar settings to apply it to the feed.';
+          });
+        }
         copyButton.addEventListener('click', async () => {
           await navigator.clipboard.writeText(feedInput.value);
           copyButton.textContent = 'Copied';
@@ -244,6 +276,7 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
         });
         if (
           saveSettingsButton instanceof HTMLButtonElement &&
+          timeZoneInput instanceof HTMLInputElement &&
           breakfastTimeInput instanceof HTMLInputElement &&
           breakfastDurationInput instanceof HTMLInputElement &&
           lunchTimeInput instanceof HTMLInputElement &&
@@ -262,6 +295,7 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
                   accept: 'application/json',
                 },
                 body: JSON.stringify({
+                  timeZone: timeZoneInput.value,
                   mealTimes: {
                     Breakfast: breakfastTimeInput.value,
                     Lunch: lunchTimeInput.value,
@@ -278,6 +312,7 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
               if (!response.ok || !payload.settings) {
                 throw new Error(payload.message || 'Unable to save calendar settings');
               }
+              timeZoneInput.value = payload.settings.timeZone;
               breakfastTimeInput.value = payload.settings.mealTimes.Breakfast;
               breakfastDurationInput.value = String(payload.settings.mealDurations.Breakfast);
               lunchTimeInput.value = payload.settings.mealTimes.Lunch;
