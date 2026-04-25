@@ -1,5 +1,7 @@
 # Norish Tools
 
+[![Build Status](https://img.shields.io/github/actions/workflow/status/SamKemp/norish-tools/build-and-publish.yml?branch=master&label=build)](https://github.com/SamKemp/norish-tools/actions/workflows/build-and-publish.yml)
+
 Norish Tools is a Docker-hostable Node.js service for running utility workflows against the Norish API.
 
 The initial scaffold focuses on the service boundary rather than specific business features:
