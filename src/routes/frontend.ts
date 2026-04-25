@@ -12,6 +12,34 @@ import { getToolBySlug, toolCatalog } from '../services/tool-catalog.js';
 import { isAuthenticated } from './auth.js';
 
 export const registerFrontendRoutes = (app: FastifyInstance) => {
+  app.get('/favicon.svg', async (_request, reply) => {
+    try {
+      const response = await fetch(new URL('/favicon.svg', app.config.NORISH_BASE_URL), {
+        headers: {
+          accept: 'image/svg+xml,image/*;q=0.8,*/*;q=0.5',
+        },
+      });
+
+      if (!response.ok) {
+        const body = await safeReadBody(response);
+        requestLogProxyFailure(app, `Favicon proxy request failed with ${response.status}: ${body}`);
+        return reply.code(502).type('text/plain; charset=utf-8').send('Unable to load favicon');
+      }
+
+      const contentType = response.headers.get('content-type') ?? 'image/svg+xml';
+      const cacheControl = response.headers.get('cache-control') ?? 'public, max-age=3600';
+      const bytes = Buffer.from(await response.arrayBuffer());
+
+      return reply
+        .header('cache-control', cacheControl)
+        .type(contentType)
+        .send(bytes);
+    } catch (error) {
+      requestLogProxyFailure(app, error instanceof Error ? error.message : 'Unknown favicon proxy error');
+      return reply.code(502).type('text/plain; charset=utf-8').send('Unable to load favicon');
+    }
+  });
+
   app.get('/', async (request, reply) => {
     if (!isAuthenticated(request)) {
       return reply.redirect('/login');
@@ -61,4 +89,16 @@ const getRequestOrigin = (request: { headers: Record<string, string | string[] |
   const host = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader ?? '127.0.0.1:3000';
 
   return `${protocol}://${host}`;
+};
+
+const safeReadBody = async (response: Response) => {
+  try {
+    return await response.text();
+  } catch {
+    return '<unreadable response body>';
+  }
+};
+
+const requestLogProxyFailure = (app: FastifyInstance, message: string) => {
+  app.log.warn({ target: 'favicon-proxy' }, message);
 };
