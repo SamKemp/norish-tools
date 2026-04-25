@@ -49,20 +49,39 @@ export const registerCalendarRoutes = (app: FastifyInstance) => {
     }
 
     try {
-      const items = await app.norish.getPlannedRecipesMonth();
+      const range = buildCalendarRange(new Date());
+      const items = await app.norish.getCalendarItems(range.startISO, range.endISO);
       const body = renderPlannedRecipesMonthCalendar(items, app.calendarSettingsStore.getSettings());
 
       return reply
         .header('content-type', 'text/calendar; charset=utf-8')
-        .header('content-disposition', 'inline; filename="norish-planned-recipes-month.ics"')
+        .header('content-disposition', 'inline; filename="norish-calendar.ics"')
         .send(body);
     } catch (error) {
       request.log.error(error, 'Unable to build planned recipe calendar feed');
 
-      return reply.code(502).send({ message: 'Unable to fetch monthly planned recipes from Norish' });
+      return reply.code(502).send({ message: 'Unable to fetch calendar items from Norish' });
     }
   });
 };
+
+const buildCalendarRange = (referenceDate: Date) => {
+  const start = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate()));
+  start.setUTCDate(start.getUTCDate() - 14);
+
+  const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate()));
+  end.setUTCDate(end.getUTCDate() + 56);
+
+  return {
+    startISO: formatDate(start),
+    endISO: formatDate(end),
+  };
+};
+
+const formatDate = (value: Date) =>
+  `${value.getUTCFullYear()}-${pad(value.getUTCMonth() + 1)}-${pad(value.getUTCDate())}`;
+
+const pad = (value: number) => value.toString().padStart(2, '0');
 
 const hasCalendarAccess = (request: FastifyRequest<{ Querystring: { token?: string } }>) => {
   if (isAuthenticated(request)) {

@@ -1,10 +1,10 @@
-import type { NorishPlannedRecipe } from './norish-client.js';
+import type { NorishCalendarListItem } from './norish-client.js';
 import type { CalendarSettings, MealSlotTimeKey } from './calendar-settings-store.js';
 
 const calendarName = 'Norish Planned Recipes';
 const calendarProductId = '-//Norish Tools//Calendar Feed//EN';
 
-export const renderPlannedRecipesMonthCalendar = (items: NorishPlannedRecipe[], settings: CalendarSettings) => {
+export const renderPlannedRecipesMonthCalendar = (items: NorishCalendarListItem[], settings: CalendarSettings) => {
   const sortedItems = [...items].sort((left, right) => {
     const dateComparison = left.date.localeCompare(right.date);
 
@@ -33,14 +33,17 @@ export const renderPlannedRecipesMonthCalendar = (items: NorishPlannedRecipe[], 
   return `${lines.map(foldLine).join('\r\n')}\r\n`;
 };
 
-const renderEvent = (item: NorishPlannedRecipe, settings: CalendarSettings) => {
-  const summary = `${item.slot}: ${item.recipeName ?? 'Untitled recipe'}`;
+const renderEvent = (item: NorishCalendarListItem, settings: CalendarSettings) => {
+  const summaryTitle = item.recipeName ?? item.title ?? 'Untitled item';
+  const summary = `${item.slot}: ${summaryTitle}`;
   const descriptionParts = [
     `Meal slot: ${item.slot}`,
     item.recipeName ? `Recipe: ${item.recipeName}` : null,
+    item.title && item.title !== item.recipeName ? `Title: ${item.title}` : null,
+    item.itemType ? `Item type: ${item.itemType}` : null,
     item.servings !== null ? `Servings: ${item.servings}` : null,
     item.calories !== null ? `Calories: ${item.calories}` : null,
-    `Recipe ID: ${item.recipeId}`,
+    item.recipeId ? `Recipe ID: ${item.recipeId}` : null,
     `Planned item ID: ${item.id}`,
     ...buildTimeDescription(item.slot, settings),
   ].filter((value): value is string => value !== null);
@@ -77,14 +80,14 @@ const buildTimedEvent = (date: string, time: string, durationMinutes: number) =>
   return [`DTSTART:${start}`, `DTEND:${end}`];
 };
 
-const buildTimeDescription = (slot: NorishPlannedRecipe['slot'], settings: CalendarSettings) => {
+const buildTimeDescription = (slot: NorishCalendarListItem['slot'], settings: CalendarSettings) => {
   const timedSlot = getTimedSlot(slot);
   return timedSlot
     ? [`Scheduled time: ${settings.mealTimes[timedSlot]}`, `Duration: ${settings.mealDurations[timedSlot]} minutes`]
     : [];
 };
 
-const getTimedSlot = (slot: NorishPlannedRecipe['slot']): MealSlotTimeKey | null => {
+const getTimedSlot = (slot: NorishCalendarListItem['slot']): MealSlotTimeKey | null => {
   if (slot === 'Breakfast' || slot === 'Lunch' || slot === 'Dinner') {
     return slot;
   }

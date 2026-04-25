@@ -128,7 +128,7 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
             <h1 class="h2 mb-0">${escapeHtml(tool.title)}</h1>
             <span class="badge text-bg-success text-uppercase">${escapeHtml(tool.status)}</span>
           </div>
-          <p class="text-secondary mb-0">Monthly ICS export for planned recipes.</p>
+          <p class="text-secondary mb-0">Rolling ICS export using the same Norish calendar endpoint as the main app.</p>
         </div>
         <a href="/" class="btn btn-outline-dark">Back</a>
       </section>
@@ -151,6 +151,7 @@ export const renderCalendarPage = (tool: ToolDefinition, calendarFeedUrl: string
               <p id="calendar-token-status" class="small text-secondary mb-4">This URL includes a dedicated calendar feed token generated for this instance and stored outside the env file.</p>
               <h3 class="h6 text-uppercase text-secondary mb-3">Feed Contents</h3>
               <ul class="list-group list-group-flush">
+                <li class="list-group-item px-0">The feed uses Norish's internal calendar.listItems endpoint over a rolling date range instead of the one-month public endpoint.</li>
                 <li class="list-group-item px-0">Breakfast, lunch, and dinner events use configured times and durations instead of all-day entries.</li>
                 <li class="list-group-item px-0">Event summary formatted as meal slot plus recipe name.</li>
                 <li class="list-group-item px-0">Description fields for servings, calories, recipe ID, and planned item ID when available.</li>

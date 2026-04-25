@@ -25,6 +25,21 @@ export type NorishPlannedRecipe = {
   calories: number | null;
 };
 
+export type NorishCalendarListItem = {
+  id: string;
+  date: string;
+  slot: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
+  sortOrder: number;
+  itemType: string;
+  recipeId: string | null;
+  title: string | null;
+  version: number;
+  recipeName: string | null;
+  recipeImage: string | null;
+  servings: number | null;
+  calories: number | null;
+};
+
 export type NorishImportedRecipeResult = {
   recipeIds: string[];
 };
@@ -60,6 +75,14 @@ export type NorishRecipeNameMatch = {
   name: string;
   version: number;
 };
+
+type TrpcBatchResponse<T> = Array<{
+  result?: {
+    data?: {
+      json?: T;
+    };
+  };
+}>;
 
 export type NorishClient = ReturnType<typeof createNorishClient>;
 
@@ -114,9 +137,42 @@ export const createNorishClient = (env: Env) => {
     }
   };
 
+  const trpcBatchQuery = async <T>(path: string, input: unknown): Promise<T> => {
+    const targetUrl = new URL(path.replace(/^\/+/, ''), trpcBaseUrl);
+    targetUrl.searchParams.set('batch', '1');
+    targetUrl.searchParams.set('input', JSON.stringify({ 0: { json: input } }));
+
+    const response = await fetch(targetUrl, {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+        'x-api-key': env.NORISH_API_KEY,
+      },
+    });
+
+    if (!response.ok) {
+      const body = await safeReadBody(response);
+      throw new Error(`Norish tRPC request failed with ${response.status}: ${body}`);
+    }
+
+    const payload = (await response.json()) as TrpcBatchResponse<T>;
+    const data = payload[0]?.result?.data?.json;
+
+    if (data === undefined) {
+      throw new Error(`Norish tRPC request returned no data for ${path}`);
+    }
+
+    return data;
+  };
+
   return {
     getHealth: () => request<NorishHealth>('health', { method: 'GET' }),
     getPlannedRecipesMonth: () => request<NorishPlannedRecipe[]>('planned-recipes/month', { method: 'GET' }),
+    getCalendarItems: (startISO: string, endISO: string) =>
+      trpcBatchQuery<NorishCalendarListItem[]>('calendar.listItems', {
+        startISO,
+        endISO,
+      }),
     searchRecipes: (input: NorishRecipeSearchInput = {}) =>
       request<NorishRecipeSearchResult>('recipes/search', {
         method: 'POST',
