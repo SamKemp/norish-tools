@@ -100,7 +100,7 @@ const normalizeDuration = (value: unknown, fallback: number) => {
   return Number.isInteger(candidate) && candidate > 0 && candidate <= 720 ? candidate : fallback;
 };
 
-const normalizeTimeZone = (value: unknown, fallback: string) => {
+function normalizeTimeZone(value: unknown, fallback: string) {
   const candidate = typeof value === 'string' ? value.trim() : '';
 
   if (!candidate) {
@@ -113,7 +113,7 @@ const normalizeTimeZone = (value: unknown, fallback: string) => {
   } catch {
     return fallback;
   }
-};
+}
 
 function getDefaultTimeZone() {
   return normalizeTimeZone(process.env.TZ, 'UTC');
